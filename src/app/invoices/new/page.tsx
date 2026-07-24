@@ -1,0 +1,158 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CURRENCIES, Client } from "@/lib/types";
+import { calculateSubtotal, calculateTotal } from "@/lib/utils";
+
+interface LineItemForm { description: string; quantity: number; rate: number; }
+const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
+
+export default function NewInvoicePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [statuses, setStatuses] = useState<string[]>(DEFAULT_STATUSES);
+  const [clientId, setClientId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState("");
+  const [status_, setStatus] = useState("draft");
+  const [currency, setCurrency] = useState("USD");
+  const [taxRate, setTaxRate] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [lineItems, setLineItems] = useState<LineItemForm[]>([{ description: "", quantity: 1, rate: 0 }]);
+  const [saving, setSaving] = useState(false);
+  const [dateError, setDateError] = useState("");
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/login");
+    Promise.all([
+      fetch("/api/clients").then((r) => r.json()),
+      fetch("/api/business").then((r) => r.json()),
+    ]).then(([clientData, bizData]) => {
+      if (Array.isArray(clientData)) setClients(clientData);
+      if (bizData && !bizData.error) {
+        if (bizData.defaultCurrency) setCurrency(bizData.defaultCurrency);
+        if (bizData.defaultTaxRate) setTaxRate(bizData.defaultTaxRate);
+        try { const parsed = JSON.parse(bizData.customStatuses || "[]"); if (Array.isArray(parsed) && parsed.length > 0) setStatuses(parsed); } catch {}
+      }
+    });
+  }, [status, router]);
+
+  function validateDates(iss: string, due: string) {
+    if (iss && due && due < iss) { setDateError("Due date cannot be before issue date"); return false; }
+    setDateError(""); return true;
+  }
+
+  function handleIssueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value; setIssueDate(v); validateDates(v, dueDate);
+    if (dueDate && v > dueDate) setDueDate("");
+  }
+
+  function handleDueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value; setDueDate(v); validateDates(issueDate, v);
+  }
+
+  function addLineItem() { setLineItems([...lineItems, { description: "", quantity: 1, rate: 0 }]); }
+  function removeLineItem(index: number) { if (lineItems.length === 1) return; setLineItems(lineItems.filter((_, i) => i !== index)); }
+  function updateLineItem(index: number, field: keyof LineItemForm, value: string | number) { const updated = [...lineItems]; (updated[index] as any)[field] = value; setLineItems(updated); }
+  function handleClientChange(id: string) { setClientId(id); const client = clients.find((c) => c.id === id); setClientName(client?.name || ""); }
+
+  const subtotal = calculateSubtotal(lineItems);
+  const total = calculateTotal(subtotal, taxRate, discount);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validateDates(issueDate, dueDate)) return;
+    if (!dueDate) { setDateError("Due date is required"); return; }
+    setSaving(true);
+    const res = await fetch("/api/invoices", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, clientName, issueDate, dueDate, status: status_, currency, taxRate, discount, notes, lineItems }),
+    });
+    if (res.ok) router.push("/invoices");
+    else { const data = await res.json(); alert(data.error || "Failed to create invoice"); setSaving(false); }
+  }
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">New Invoice</h1>
+        <Link href="/invoices" className="text-sm text-gray-600 hover:text-gray-900">Back to invoices</Link>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+              <input type="text" value="Auto-generated" disabled className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-400" />
+              <p className="text-xs text-gray-400 mt-1">Number is assigned automatically from Settings</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {CURRENCIES.map((c) => (<option key={c.code} value={c.code}>{c.symbol} {c.name}</option>))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <select value={clientId} onChange={(e) => handleClientChange(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Select a client</option>
+              {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+              <input type="date" value={issueDate} onChange={handleIssueDateChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <input type="date" value={dueDate} onChange={handleDueDateChange} min={issueDate || undefined} required className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 ${dateError ? "border-red-300 focus:ring-red-500" : "border-gray-300 focus:ring-indigo-500"}`} />
+              {dateError && <p className="text-xs text-red-500 mt-1">{dateError}</p>}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select value={status_} onChange={(e) => setStatus(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              {statuses.map((s) => (<option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>))}
+            </select>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h2 className="font-semibold text-gray-900 mb-4">Line Items</h2>
+          <div className="space-y-3">
+            {lineItems.map((item, i) => (
+              <div key={i} className="grid grid-cols-[1fr_80px_100px_100px_32px] gap-2 items-end">
+                <div><label className="block text-xs text-gray-500 mb-1">Description</label><input type="text" value={item.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} placeholder="Item description" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Qty</label><input type="number" value={item.quantity} onChange={(e) => updateLineItem(i, "quantity", parseFloat(e.target.value) || 0)} min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Rate</label><input type="number" value={item.rate} onChange={(e) => updateLineItem(i, "rate", parseFloat(e.target.value) || 0)} min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Amount</label><div className="px-3 py-2 text-sm bg-gray-50 rounded-md border border-gray-200">{(item.quantity * item.rate).toFixed(2)}</div></div>
+                <button type="button" onClick={() => removeLineItem(i)} className="text-red-500 hover:text-red-700 pb-2">&times;</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addLineItem} className="mt-3 text-sm text-indigo-600 hover:underline">+ Add line item</button>
+        </div>
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
+            <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Tax (%)</span><input type="number" value={taxRate} onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" className="w-24 border border-gray-300 rounded-md px-3 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Discount</span><input type="number" value={discount} onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)} min="0" step="any" className="w-24 border border-gray-300 rounded-md px-3 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div className="border-t pt-3 flex justify-between font-semibold"><span>Total</span><span className="text-indigo-600">{total.toFixed(2)}</span></div>
+          </div>
+          <div className="mt-4"><label className="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Payment terms, thank you note, etc." className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+        </div>
+        <div className="flex gap-3">
+          <button type="submit" disabled={saving} className="bg-indigo-600 text-white px-6 py-2 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? "Creating..." : "Create Invoice"}</button>
+          <Link href="/invoices" className="px-6 py-2 rounded-md font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</Link>
+        </div>
+      </form>
+    </div>
+  );
+}
