@@ -15,9 +15,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user || !user.email || !ADMIN_EMAILS.includes(user.email)) return res.status(403).json({ error: "Forbidden" });
 
   const { type } = req.body;
-  const prefix = type === "monthly" ? "MONTHLY" : type === "lifetime" ? "LIFETIME" : "TOKEN";
+  if (type !== "monthly" && type !== "lifetime") return res.status(400).json({ error: "Invalid type" });
+
+  const prefix = type === "monthly" ? "MONTHLY" : "LIFETIME";
   const code = crypto.randomBytes(6).toString("hex").toUpperCase();
-  const token = `INVPRO-${prefix}-${code}`;
+  const token = `GOGO-${prefix}-${code}`;
+
+  await prisma.activationToken.create({
+    data: {
+      token,
+      type,
+      createdBy: session.user.id,
+    },
+  });
 
   return res.json({ token, type });
 }

@@ -86,6 +86,16 @@ model Invoice {
   lineItems LineItem[]
 }
 
+model ActivationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  type      String   @default("monthly")
+  usedBy    String?
+  usedAt    DateTime?
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
 model LineItem {
   id          String  @id @default(cuid())
   invoiceId   String
