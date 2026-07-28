@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/useTranslation";
 
 export default function PricingPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [token, setToken] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");

@@ -5,11 +5,13 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, getStatusColor, formatDate } from "@/lib/utils";
+import { useTranslation } from "@/lib/useTranslation";
 import { Invoice } from "@/lib/types";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currency, setCurrency] = useState("ZAR");
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function DashboardPage() {
     }
   }, [status, router]);
 
-  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">{t("common", "loading")}</div>;
 
   function calcTotal(i: Invoice) {
     const sub = i.lineItems.reduce((s, l) => s + l.quantity * l.rate, 0);
@@ -52,30 +54,30 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {session?.user?.name || "User"}</p>
+          <p className="text-gray-600">{t("dashboard", "welcome")}, {session?.user?.name || "User"}</p>
         </div>
         <Link href="/invoices/new" className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
-          New Invoice
+          {t("dashboard", "newInvoice")}
         </Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-5 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Total Invoices</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t("dashboard", "totalInvoices")}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{invoices.length}</p>
         </div>
         <div className="bg-white p-5 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Paid</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t("dashboard", "paid")}</p>
           <p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p>
           <p className="text-xs text-green-500 mt-1">{formatCurrency(totalPaid, currency)}</p>
         </div>
         <div className="bg-white p-5 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Outstanding</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t("dashboard", "outstanding")}</p>
           <p className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</p>
           <p className="text-xs text-yellow-500 mt-1">{formatCurrency(totalOutstanding, currency)}</p>
         </div>
         <div className="bg-white p-5 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Draft</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t("dashboard", "draft")}</p>
           <p className="text-2xl font-bold text-gray-400 mt-1">{draftCount}</p>
           <p className="text-xs text-gray-400 mt-1">{formatCurrency(totalDraft, currency)}</p>
         </div>
@@ -83,15 +85,15 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-lg text-white">
-          <p className="text-sm opacity-80">Total Received</p>
+          <p className="text-sm opacity-80">{t("dashboard", "totalReceived")}</p>
           <p className="text-3xl font-bold mt-1">{formatCurrency(totalPaid, currency)}</p>
         </div>
         <div className="bg-gradient-to-br from-yellow-500 to-orange-500 p-6 rounded-lg text-white">
-          <p className="text-sm opacity-80">Still Owing You</p>
+          <p className="text-sm opacity-80">{t("dashboard", "stillOwing")}</p>
           <p className="text-3xl font-bold mt-1">{formatCurrency(totalOutstanding, currency)}</p>
         </div>
         <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-6 rounded-lg text-white">
-          <p className="text-sm opacity-80">Total Value (All)</p>
+          <p className="text-sm opacity-80">{t("dashboard", "totalValue")}</p>
           <p className="text-3xl font-bold mt-1">{formatCurrency(totalPaid + totalOutstanding + totalDraft, currency)}</p>
         </div>
       </div>
@@ -100,22 +102,22 @@ export default function DashboardPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 flex items-center gap-3">
           <span className="text-2xl">&#9888;</span>
           <div>
-            <p className="font-medium text-red-800">{overdueCount} overdue invoice{overdueCount > 1 ? "s" : ""}</p>
+            <p className="font-medium text-red-800">{overdueCount} {overdueCount > 1 ? t("dashboard", "overdueAlertPlural") : t("dashboard", "overdueAlert")}</p>
             <p className="text-sm text-red-600">{formatCurrency(
               invoices.filter((i) => i.status === "overdue").reduce((s, i) => s + calcTotal(i), 0), currency
-            )} outstanding. Consider following up with clients.</p>
+            )} {t("dashboard", "overdueDesc")}</p>
           </div>
         </div>
       )}
 
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Recent Activity</h2>
+          <h2 className="font-semibold text-gray-900">{t("dashboard", "recentActivity")}</h2>
           <Link href="/invoices" className="text-sm text-indigo-600 hover:underline">View all</Link>
         </div>
         {recentActivity.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
-            No invoices yet. <Link href="/invoices/new" className="text-indigo-600 hover:underline">Create your first invoice</Link>
+            {t("dashboard", "noInvoices")} <Link href="/invoices/new" className="text-indigo-600 hover:underline">{t("dashboard", "createFirst")}</Link>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">

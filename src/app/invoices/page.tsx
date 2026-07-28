@@ -5,11 +5,13 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, getStatusColor, formatDate } from "@/lib/utils";
+import { useTranslation } from "@/lib/useTranslation";
 import { Invoice } from "@/lib/types";
 
 export default function InvoicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -63,32 +65,32 @@ export default function InvoicesPage() {
     return sum + sub + sub * (inv.taxRate / 100) - inv.discount;
   }, 0);
 
-  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">{t("common", "loading")}</div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("invoices", "title")}</h1>
           <p className="text-sm text-gray-500">{filtered.length} invoice{filtered.length !== 1 ? "s" : ""} &middot; {formatCurrency(totalAmount, "ZAR")}</p>
         </div>
-        <Link href="/invoices/new" className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">New Invoice</Link>
+        <Link href="/invoices/new" className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">{t("invoices", "newInvoice")}</Link>
       </div>
 
       <div className="flex gap-3 mb-6">
-        <input type="text" placeholder="Search by number or client..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input type="text" placeholder={t("invoices", "search")} value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <select value={filter} onChange={(e) => setFilter(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
+          <option value="all">{t("invoices", "allStatus")}</option>
+          <option value="draft">{t("invoices", "draft")}</option>
+          <option value="sent">{t("invoices", "sent")}</option>
+          <option value="paid">{t("invoices", "paid")}</option>
+          <option value="overdue">{t("invoices", "overdue")}</option>
         </select>
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center text-gray-500">
-          No invoices found. <Link href="/invoices/new" className="text-indigo-600 hover:underline">Create one</Link>
+          {t("invoices", "noFound")} <Link href="/invoices/new" className="text-indigo-600 hover:underline">{t("invoices", "createOne")}</Link>
         </div>
       ) : (
         <div className="space-y-3">
@@ -108,8 +110,8 @@ export default function InvoicesPage() {
                   <div className="flex items-center gap-4 flex-shrink-0">
                     <p className="font-semibold text-gray-900">{formatCurrency(total, inv.currency)}</p>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDuplicate(inv)} disabled={duplicating === inv.id} className="text-xs text-gray-500 hover:text-indigo-600 disabled:opacity-50" title="Duplicate">{duplicating === inv.id ? "..." : "Duplicate"}</button>
-                      <button onClick={() => handleDelete(inv.id)} className="text-xs text-gray-500 hover:text-red-600" title="Delete">Delete</button>
+                      <button onClick={() => handleDuplicate(inv)} disabled={duplicating === inv.id} className="text-xs text-gray-500 hover:text-indigo-600 disabled:opacity-50" title="Duplicate">{duplicating === inv.id ? "..." : t("invoices", "duplicate")}</button>
+                      <button onClick={() => handleDelete(inv.id)} className="text-xs text-gray-500 hover:text-red-600" title="Delete">{t("invoices", "delete")}</button>
                     </div>
                   </div>
                 </div>

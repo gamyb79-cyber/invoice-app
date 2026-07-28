@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/useTranslation";
 
 const ADMIN_EMAILS = ["ga.myb79@gmail.com"];
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [tokenType, setTokenType] = useState("monthly");
   const [generatedToken, setGeneratedToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,7 +47,7 @@ export default function AdminPage() {
     navigator.clipboard.writeText(generatedToken);
   }
 
-  if (status === "loading") return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (status === "loading") return <div className="text-center py-12 text-gray-500">{t("common", "loading")}</div>;
   if (!session) { router.push("/login"); return null; }
   if (blocked) return <div className="text-center py-12 text-gray-500">Access denied.</div>;
 

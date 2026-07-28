@@ -4,12 +4,14 @@ import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { CURRENCIES } from "@/lib/types";
+import { useTranslation } from "@/lib/useTranslation";
 
 const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,13 +104,13 @@ export default function SettingsPage() {
     setSaving(false);
   }
 
-  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">{t("common", "loading")}</div>;
 
   const user = session?.user as any;
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("settings", "title")}</h1>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
         <h2 className="font-semibold text-gray-900 mb-1">Account</h2>
@@ -141,34 +143,34 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4 mt-4">
-          <h2 className="font-semibold text-gray-900">Business Information</h2>
+          <h2 className="font-semibold text-gray-900">{t("settings", "businessInfo")}</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Tax ID</label><input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "businessName")}</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "businessEmail")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "phone")}</label><input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "taxId")}</label><input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
           </div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "address")}</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
           <div className="grid grid-cols-4 gap-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">City</label><input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">State</label><input type="text" value={state} onChange={(e) => setState(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Zip</label><input type="text" value={zip} onChange={(e) => setZip(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Country</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "city")}</label><input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "state")}</label><input type="text" value={state} onChange={(e) => setState(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "zip")}</label><input type="text" value={zip} onChange={(e) => setZip(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "country")}</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4 mt-4">
-          <h2 className="font-semibold text-gray-900">Invoice Defaults</h2>
+          <h2 className="font-semibold text-gray-900">{t("settings", "invoiceSettings")}</h2>
           <div className="grid grid-cols-3 gap-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Currency</label><select value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{CURRENCIES.map((c) => (<option key={c.code} value={c.code}>{c.symbol} {c.code}</option>))}</select></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Default Tax Rate (%)</label><input type="number" value={defaultTaxRate} onChange={(e) => setDefaultTaxRate(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Invoice Prefix</label><input type="text" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "defaultCurrency")}</label><select value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{CURRENCIES.map((c) => (<option key={c.code} value={c.code}>{c.symbol} {c.code}</option>))}</select></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "defaultTaxRate")}</label><input type="number" value={defaultTaxRate} onChange={(e) => setDefaultTaxRate(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "invoicePrefix")}</label><input type="text" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
           </div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Next Invoice Number</label><input type="number" value={nextInvoiceNumber} onChange={(e) => setNextInvoiceNumber(parseInt(e.target.value) || 1001)} min="1" className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">{t("settings", "nextNumber")}</label><input type="number" value={nextInvoiceNumber} onChange={(e) => setNextInvoiceNumber(parseInt(e.target.value) || 1001)} min="1" className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4 mt-4">
-          <h2 className="font-semibold text-gray-900">Custom Invoice Statuses</h2>
+          <h2 className="font-semibold text-gray-900">{t("settings", "customStatuses")}</h2>
           <p className="text-sm text-gray-500">Add your own statuses like &quot;PO&quot;, &quot;Pending&quot;, &quot;Cancelled&quot;, etc.</p>
           <div className="flex gap-2">
             <input type="text" value={newStatus} onChange={(e) => setNewStatus(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addStatus(); } }} placeholder="New status (e.g. PO)" className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -187,7 +189,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 flex items-center gap-3">
-          <button type="submit" disabled={saving} className="bg-indigo-600 text-white px-6 py-2 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? "Saving..." : "Save Settings"}</button>
+          <button type="submit" disabled={saving} className="bg-indigo-600 text-white px-6 py-2 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? "Saving..." : t("settings", "save")}</button>
           {saved && <span className="text-sm text-green-600">Settings saved!</span>}
         </div>
       </form>

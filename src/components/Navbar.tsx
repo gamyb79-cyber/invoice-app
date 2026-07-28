@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useTranslation } from "@/lib/useTranslation";
+import LanguageSelector from "./LanguageSelector";
 
 const ADMIN_EMAILS = ["ga.myb79@gmail.com"];
 
@@ -11,14 +13,15 @@ export default function Navbar() {
   const { data: session } = useSession();
   const user = session?.user as any;
   const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+  const { t } = useTranslation();
 
   const navLinks = session
     ? [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/invoices", label: "Invoices" },
-        { href: "/clients", label: "Clients" },
-        { href: "/analytics", label: "Analytics" },
-        { href: "/settings", label: "Settings" },
+        { href: "/dashboard", label: t("nav", "dashboard") },
+        { href: "/invoices", label: t("nav", "invoices") },
+        { href: "/clients", label: t("nav", "clients") },
+        { href: "/analytics", label: t("nav", "analytics") },
+        { href: "/settings", label: t("nav", "settings") },
       ]
     : [];
 
@@ -36,18 +39,19 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link href="/" className="text-xl font-bold text-indigo-600">GOGO Invoice</Link>
         <div className="flex items-center gap-4">
+          <LanguageSelector />
           {session ? (
             <>
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href} className={`text-sm font-medium transition-colors ${pathname === link.href ? "text-indigo-600" : "text-gray-600 hover:text-gray-900"}`}>{link.label}</Link>
               ))}
               {getPlanBadge()}
-              <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-sm text-gray-600 hover:text-gray-900">Sign out</button>
+              <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-sm text-gray-600 hover:text-gray-900">{t("nav", "signOut")}</button>
             </>
           ) : (
             <>
-              <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">Sign in</Link>
-              <Link href="/register" className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700">Get Started</Link>
+              <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">{t("nav", "signIn")}</Link>
+              <Link href="/register" className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700">{t("nav", "getStarted")}</Link>
             </>
           )}
         </div>

@@ -5,11 +5,13 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
+import { useTranslation } from "@/lib/useTranslation";
 import { Invoice } from "@/lib/types";
 
 export default function AnalyticsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,7 +25,7 @@ export default function AnalyticsPage() {
     }
   }, [status, router]);
 
-  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (status === "loading" || loading) return <div className="text-center py-12 text-gray-500">{t("common", "loading")}</div>;
 
   if (!hasAccess) {
     return (
@@ -79,7 +81,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Analytics & Tax Reports</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("nav", "analytics")}</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-6 rounded-lg border border-gray-200">
