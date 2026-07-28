@@ -22,6 +22,7 @@ export default function Navbar() {
         { href: "/clients", label: t("nav", "clients") },
         { href: "/analytics", label: t("nav", "analytics") },
         { href: "/settings", label: t("nav", "settings") },
+        { href: "/referral", label: "Refer" },
       ]
     : [];
 

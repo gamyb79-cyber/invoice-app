@@ -57,6 +57,9 @@ function InvoicePDF({ invoice, business }: { invoice: Invoice; business: Busines
         </div>
       </div>
       {invoice.notes && <div style={{ marginTop: "30px", padding: "15px", backgroundColor: "#f9fafb", borderRadius: "8px" }}><p style={{ fontSize: "13px", fontWeight: "bold", color: "#374151", marginBottom: "5px" }}>Notes:</p><p style={{ fontSize: "13px", color: "#6b7280", whiteSpace: "pre-wrap" }}>{invoice.notes}</p></div>}
+      <div style={{ marginTop: "40px", paddingTop: "15px", borderTop: "1px solid #e5e7eb", textAlign: "center" }}>
+        <p style={{ fontSize: "11px", color: "#9ca3af" }}>Powered by <span style={{ color: "#4f46e5", fontWeight: "bold" }}>GOGO Invoice</span> - Free invoicing for South African businesses</p>
+      </div>
     </div>
   );
 }
@@ -211,11 +214,12 @@ export default function InvoiceDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{invoice.number}</h1>
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(invoice.status)}`}>{invoice.status}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {!editing && <button onClick={() => setEditing(true)} className="text-sm text-indigo-600 hover:underline">{t("detail", "edit")}</button>}
           <button onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-sm text-green-600 hover:underline disabled:opacity-50">{downloadingPdf ? "Opening..." : t("detail", "downloadPdf")}</button>
           <a href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="text-sm text-[#25D366] hover:underline font-medium">{t("detail", "sendWhatsApp")}</a>
           <a href={getEmailLink()} className="text-sm text-blue-600 hover:underline font-medium">{t("detail", "email")}</a>
+          <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/invoices/pdf?id=${id}`); }} className="text-sm text-gray-500 hover:underline">Copy Link</button>
           <button onClick={handleDelete} className="text-sm text-red-600 hover:underline">{t("detail", "delete")}</button>
           <Link href="/invoices" className="text-sm text-gray-600 hover:text-gray-900">{t("detail", "back")}</Link>
         </div>
