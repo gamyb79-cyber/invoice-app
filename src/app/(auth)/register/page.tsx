@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslation } from "@/lib/useTranslation";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (refCode) {
-      sessionStorage.setItem(" referral_code", refCode);
+      sessionStorage.setItem("referral_code", refCode);
     }
   }, [refCode]);
 
@@ -56,6 +56,7 @@ export default function RegisterPage() {
     <div className="flex justify-center items-center min-h-[70vh]">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-sm border border-gray-200">
         <h1 className="text-2xl font-bold text-center text-gray-900 mb-6">{t("register", "title")}</h1>
+        {refCode && <p className="text-sm text-indigo-600 text-center mb-4">You&apos;ve been invited! Complete your registration below.</p>}
         {error && <p className="text-red-600 text-sm text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -80,5 +81,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
