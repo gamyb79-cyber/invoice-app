@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CURRENCIES, Client } from "@/lib/types";
 import { calculateSubtotal, calculateTotal, formatCurrency } from "@/lib/utils";
 import { useTranslation } from "@/lib/useTranslation";
+import InvoiceScanner from "@/components/InvoiceScanner";
+import VoiceDictation from "@/components/VoiceDictation";
 
 interface LineItemForm { description: string; quantity: number; rate: number; }
 const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
@@ -34,6 +36,7 @@ export default function NewInvoicePage() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [savingClient, setSavingClient] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -68,6 +71,48 @@ export default function NewInvoicePage() {
   function removeLineItem(index: number) { if (lineItems.length === 1) return; setLineItems(lineItems.filter((_, i) => i !== index)); }
   function updateLineItem(index: number, field: keyof LineItemForm, value: string | number) { const updated = [...lineItems]; (updated[index] as any)[field] = value; setLineItems(updated); }
   function handleClientChange(id: string) { setClientId(id); const client = clients.find((c) => c.id === id); setClientName(client?.name || ""); }
+
+  const handleScanResult = useCallback((result: { clientName: string; items: { description: string; quantity: number; rate: number }[]; total: number }) => {
+    if (result.clientName) setClientName(result.clientName);
+    if (result.items.length > 0) {
+      setLineItems(result.items);
+    }
+    if (result.total > 0 && result.items.length === 0) {
+      setLineItems([{ description: "Scanned invoice total", quantity: 1, rate: result.total }]);
+    }
+  }, []);
+
+  const handleVoiceResult = useCallback((text: string) => {
+    if (!text.trim()) return;
+    const lines = text.split(/[,.]|\band\b/i).map((s) => s.trim()).filter(Boolean);
+
+    const nameMatch = text.match(/(?:for|to|bill)\s+(.+?)(?:,|\.|\band\b)/i);
+    if (nameMatch) setClientName(nameMatch[1].trim());
+
+    const items: LineItemForm[] = [];
+    for (const line of lines) {
+      const itemMatch = line.match(/(\d+)\s+(.+?)\s+(?:at|@|each)?\s*[R$£€]?\s*([\d,]+(?:\.\d+)?)/i);
+      if (itemMatch) {
+        items.push({
+          description: itemMatch[2].trim(),
+          quantity: parseInt(itemMatch[1]) || 1,
+          rate: parseFloat(itemMatch[3].replace(/,/g, "")) || 0,
+        });
+      } else {
+        const simpleMatch = line.match(/(.+?)\s+[R$£€]?\s*([\d,]+(?:\.\d+)?)/i);
+        if (simpleMatch && !simpleMatch[1].match(/total|tax|vat|discount|subtotal|invoice|date/i)) {
+          items.push({
+            description: simpleMatch[1].trim(),
+            quantity: 1,
+            rate: parseFloat(simpleMatch[2].replace(/,/g, "")) || 0,
+          });
+        }
+      }
+    }
+
+    if (items.length > 0) setLineItems(items);
+    else setNotes((prev) => prev ? prev + "\n" + text : text);
+  }, []);
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
@@ -109,6 +154,27 @@ export default function NewInvoicePage() {
         <h1 className="text-2xl font-bold text-gray-900">{t("newInvoice", "title")}</h1>
         <Link href="/invoices" className="text-sm text-gray-600 hover:text-gray-900">Back to invoices</Link>
       </div>
+
+      <div className="mb-6">
+        <button
+          onClick={() => setShowAIPanel(!showAIPanel)}
+          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-3"
+        >
+          <span className="text-xl">&#x1F916;</span>
+          <span>AI Assistant - Scan Paper Invoice or Dictate Details</span>
+          <svg className={`w-4 h-4 transition-transform ${showAIPanel ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      {showAIPanel && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <InvoiceScanner onScanResult={handleScanResult} />
+          <VoiceDictation onResult={handleVoiceResult} />
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -129,7 +195,14 @@ export default function NewInvoicePage() {
               <label className="block text-sm font-medium text-gray-700">{t("newInvoice", "client")}</label>
               <button type="button" onClick={() => setShowNewClient(true)} className="text-xs text-indigo-600 hover:underline">{t("newInvoice", "addNewClient")}</button>
             </div>
-            <select value={clientId} onChange={(e) => handleClientChange(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <input
+              type="text"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Type client name or select below"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+            />
+            <select value={clientId} onChange={(e) => { handleClientChange(e.target.value); }} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">{t("newInvoice", "selectClient")}</option>
               {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
