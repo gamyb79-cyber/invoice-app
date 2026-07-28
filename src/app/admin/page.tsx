@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+
+const ADMIN_EMAILS = ["ga.myb79@gmail.com"];
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -11,6 +13,16 @@ export default function AdminPage() {
   const [generatedToken, setGeneratedToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [blocked, setBlocked] = useState(false);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      const user = session?.user as any;
+      if (!user?.email || !ADMIN_EMAILS.includes(user.email)) {
+        setBlocked(true);
+      }
+    }
+  }, [status, session]);
 
   async function generateToken() {
     setLoading(true);
@@ -35,6 +47,7 @@ export default function AdminPage() {
 
   if (status === "loading") return <div className="text-center py-12 text-gray-500">Loading...</div>;
   if (!session) { router.push("/login"); return null; }
+  if (blocked) return <div className="text-center py-12 text-gray-500">Access denied.</div>;
 
   return (
     <div className="max-w-2xl mx-auto">

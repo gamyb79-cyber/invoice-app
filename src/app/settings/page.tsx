@@ -26,7 +26,7 @@ export default function SettingsPage() {
   const [country, setCountry] = useState("");
   const [taxId, setTaxId] = useState("");
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
-  const [defaultCurrency, setDefaultCurrency] = useState("USD");
+  const [defaultCurrency, setDefaultCurrency] = useState("ZAR");
   const [invoicePrefix, setInvoicePrefix] = useState("INV");
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState(1001);
   const [customStatuses, setCustomStatuses] = useState<string[]>(DEFAULT_STATUSES);
@@ -51,7 +51,7 @@ export default function SettingsPage() {
           setLogo(data.logo || "");
           setLogoPreview(data.logo || "");
           setDefaultTaxRate(data.defaultTaxRate || 0);
-          setDefaultCurrency(data.defaultCurrency || "USD");
+          setDefaultCurrency(data.defaultCurrency || "ZAR");
           setInvoicePrefix(data.invoicePrefix || "INV");
           setNextInvoiceNumber(data.nextInvoiceNumber || 1001);
           try {

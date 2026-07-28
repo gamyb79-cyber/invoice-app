@@ -20,7 +20,7 @@ export default function NewInvoicePage() {
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
   const [status_, setStatus] = useState("draft");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("ZAR");
   const [taxRate, setTaxRate] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");

@@ -4,13 +4,15 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
+const ADMIN_EMAILS = ["ga.myb79@gmail.com"];
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const session = await getServerSession(req, res, authOptions);
   if (!session?.user?.id) return res.status(401).json({ error: "Unauthorized" });
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } });
-  if (!user) return res.status(403).json({ error: "Unauthorized" });
+  if (!user || !user.email || !ADMIN_EMAILS.includes(user.email)) return res.status(403).json({ error: "Forbidden" });
 
   const { type } = req.body;
   const prefix = type === "monthly" ? "MONTHLY" : type === "lifetime" ? "LIFETIME" : "TOKEN";

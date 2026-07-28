@@ -19,7 +19,6 @@ export default function Navbar() {
         { href: "/clients", label: "Clients" },
         { href: "/analytics", label: "Analytics" },
         { href: "/settings", label: "Settings" },
-        ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
       ]
     : [];
 
