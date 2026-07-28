@@ -6,13 +6,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, getStatusColor, formatDate } from "@/lib/utils";
 import { useTranslation } from "@/lib/useTranslation";
-import { Invoice } from "@/lib/types";
+import { Invoice, Client } from "@/lib/types";
+import CashFlowWidget from "@/components/CashFlowWidget";
+import AnomalyWidget from "@/components/AnomalyWidget";
+import ClientRiskScore from "@/components/ClientRiskScore";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [currency, setCurrency] = useState("ZAR");
   const [loading, setLoading] = useState(true);
 
@@ -22,9 +26,11 @@ export default function DashboardPage() {
       Promise.all([
         fetch("/api/invoices").then((r) => r.json()),
         fetch("/api/business").then((r) => r.json()),
-      ]).then(([invData, bizData]) => {
+        fetch("/api/clients").then((r) => r.json()),
+      ]).then(([invData, bizData, clientData]) => {
         setInvoices(Array.isArray(invData) ? invData : []);
         if (bizData && !bizData.error) setCurrency(bizData.defaultCurrency || "ZAR");
+        if (Array.isArray(clientData)) setClients(clientData);
         setLoading(false);
       }).catch(() => setLoading(false));
     }
@@ -109,6 +115,15 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <CashFlowWidget invoices={invoices} />
+        <AnomalyWidget invoices={invoices} />
+      </div>
+
+      <div className="mb-8">
+        <ClientRiskScore invoices={invoices} clients={clients} />
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">

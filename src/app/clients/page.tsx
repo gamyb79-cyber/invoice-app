@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Client } from "@/lib/types";
+import { Client, Invoice } from "@/lib/types";
 import { useTranslation } from "@/lib/useTranslation";
+import ClientRiskScore from "@/components/ClientRiskScore";
 
 export default function ClientsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { t } = useTranslation();
   const [clients, setClients] = useState<Client[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export default function ClientsPage() {
     if (status === "unauthenticated") router.push("/login");
     if (status === "authenticated") {
       fetch("/api/clients").then((r) => r.json()).then((d) => { setClients(Array.isArray(d) ? d : []); setLoading(false); });
+      fetch("/api/invoices").then((r) => r.json()).then((d) => { if (Array.isArray(d)) setInvoices(d); });
     }
   }, [status, router]);
 
@@ -66,6 +69,10 @@ export default function ClientsPage() {
         <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">{t("clients", "addClient")}</button>
       </div>
 
+      <div className="mb-6">
+        <ClientRiskScore invoices={invoices} clients={clients} />
+      </div>
+
       {showForm && (
         <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">{editingId ? "Edit Client" : "New Client"}</h2>
@@ -95,13 +102,16 @@ export default function ClientsPage() {
           {clients.map((c) => (
             <div key={c.id} className="bg-white p-4 rounded-lg border border-gray-200">
               <div className="flex items-start justify-between">
-                <div>
+                <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900">{c.name}</h3>
                   {c.email && <p className="text-sm text-gray-600">{c.email}</p>}
                   {c.phone && <p className="text-sm text-gray-600">{c.phone}</p>}
                   {c.city && <p className="text-sm text-gray-500">{[c.city, c.state, c.country].filter(Boolean).join(", ")}</p>}
+                  <div className="mt-2">
+                    <ClientRiskScore invoices={invoices} clients={[c]} />
+                  </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-shrink-0">
                   <button onClick={() => startEdit(c)} className="text-sm text-indigo-600 hover:underline">{t("common", "edit")}</button>
                   <button onClick={() => handleDelete(c.id)} className="text-sm text-red-600 hover:underline">{t("common", "delete")}</button>
                 </div>

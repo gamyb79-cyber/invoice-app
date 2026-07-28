@@ -9,6 +9,7 @@ import { calculateSubtotal, calculateTotal, formatCurrency } from "@/lib/utils";
 import { useTranslation } from "@/lib/useTranslation";
 import InvoiceScanner from "@/components/InvoiceScanner";
 import VoiceDictation from "@/components/VoiceDictation";
+import NaturalLanguageCreator from "@/components/NaturalLanguageCreator";
 
 interface LineItemForm { description: string; quantity: number; rate: number; }
 const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
@@ -79,6 +80,14 @@ export default function NewInvoicePage() {
     }
     if (result.total > 0 && result.items.length === 0) {
       setLineItems([{ description: "Scanned invoice total", quantity: 1, rate: result.total }]);
+    }
+  }, []);
+
+  const handleNLParsed = useCallback((result: { clientName: string; items: { description: string; quantity: number; rate: number }[]; total: number | null }) => {
+    if (result.clientName) setClientName(result.clientName);
+    if (result.items.length > 0) setLineItems(result.items);
+    if (result.total !== null && result.items.length === 0) {
+      setLineItems([{ description: "Invoice total", quantity: 1, rate: result.total }]);
     }
   }, []);
 
@@ -172,6 +181,9 @@ export default function NewInvoicePage() {
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <InvoiceScanner onScanResult={handleScanResult} />
           <VoiceDictation onResult={handleVoiceResult} />
+          <div className="md:col-span-2">
+            <NaturalLanguageCreator onParsed={handleNLParsed} />
+          </div>
         </div>
       )}
 

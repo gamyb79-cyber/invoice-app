@@ -7,6 +7,8 @@ import Link from "next/link";
 import { CURRENCIES, Invoice, Client } from "@/lib/types";
 import { calculateSubtotal, calculateTotal, formatCurrency } from "@/lib/utils";
 import { useTranslation } from "@/lib/useTranslation";
+import SmartReminder from "@/components/SmartReminder";
+import ClientRiskScore from "@/components/ClientRiskScore";
 
 interface LineItemForm { id?: string; description: string; quantity: number; rate: number; }
 interface BusinessInfo { name: string; email: string; phone: string; address: string; city: string; state: string; zip: string; country: string; taxId: string; logo: string; }
@@ -69,6 +71,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [business, setBusiness] = useState<BusinessInfo | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
   const [statuses, setStatuses] = useState<string[]>(DEFAULT_STATUSES);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,8 @@ export default function InvoiceDetailPage() {
         fetch(`/api/invoices?id=${id}`).then((r) => r.json()),
         fetch("/api/clients").then((r) => r.json()),
         fetch("/api/business").then((r) => r.json()),
-      ]).then(([invData, clientData, bizData]) => {
+        fetch("/api/invoices").then((r) => r.json()),
+      ]).then(([invData, clientData, bizData, allInvData]) => {
         if (invData && !invData.error) {
           setInvoice(invData); setNumber(invData.number); setClientId(invData.clientId || "");
           setClientName(invData.clientName || ""); setIssueDate(invData.issueDate); setDueDate(invData.dueDate);
@@ -103,6 +107,7 @@ export default function InvoiceDetailPage() {
           setLineItems(invData.lineItems.map((l: any) => ({ id: l.id, description: l.description, quantity: l.quantity, rate: l.rate })));
         }
         if (Array.isArray(clientData)) setClients(clientData);
+        if (Array.isArray(allInvData)) setAllInvoices(allInvData);
         if (bizData && !bizData.error) {
           setBusiness(bizData);
           try { const parsed = JSON.parse(bizData.customStatuses || "[]"); if (Array.isArray(parsed) && parsed.length > 0) setStatuses(parsed); } catch {}
@@ -292,6 +297,14 @@ export default function InvoiceDetailPage() {
           {invoice.notes && <div className="bg-white p-6 rounded-lg border border-gray-200"><h2 className="font-semibold text-gray-900 mb-2">{t("detail", "notes")}</h2><p className="text-sm text-gray-600 whitespace-pre-wrap">{invoice.notes}</p></div>}
         </div>
       )}
+
+      {!editing && invoice.status !== "paid" && (
+        <div className="mt-6 space-y-4">
+          {invoice.clientId && <ClientRiskScore invoices={allInvoices} clients={clients} clientId={invoice.clientId} />}
+          <SmartReminder invoice={invoice} allInvoices={allInvoices} />
+        </div>
+      )}
+
       <div ref={pdfRef} style={{ position: "absolute", left: "-9999px", top: 0 }}><InvoicePDF invoice={invoice} business={business} /></div>
     </div>
   );
