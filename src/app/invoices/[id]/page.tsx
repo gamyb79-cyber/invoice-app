@@ -163,9 +163,9 @@ export default function InvoiceDetailPage() {
   function getWhatsAppLink() {
     const client = clients.find((c) => c.id === invoice?.clientId);
     const phone = client?.phone?.replace(/[^0-9]/g, "") || "";
-    const subtotal = calculateSubtotal(invoice?.lineItems || []);
-    const total = calculateTotal(subtotal, invoice?.taxRate || 0, invoice?.discount || 0);
-    const sym = invoice?.currency === "ZAR" ? "R" : invoice?.currency === "EUR" ? "€" : invoice?.currency === "GBP" ? "£" : "$";
+    const sub = (invoice?.lineItems || []).reduce((s, l) => s + l.quantity * l.rate, 0);
+    const total = sub + sub * ((invoice?.taxRate || 0) / 100) - (invoice?.discount || 0);
+    const sym = invoice?.currency === "ZAR" ? "R" : invoice?.currency === "EUR" ? "\u20AC" : invoice?.currency === "GBP" ? "\u00A3" : "$";
     const pdfUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/invoices/pdf?id=${id}`;
     const message = encodeURIComponent(
       `Hi ${invoice?.clientName || ""},\n\n` +
@@ -173,9 +173,26 @@ export default function InvoiceDetailPage() {
       `Download/View PDF: ${pdfUrl}\n\n` +
       `Thank you for your business!`
     );
-    if (phone) {
-      return `https://wa.me/${phone.startsWith("27") ? phone : "27" + phone}?text=${message}`;
-    }
+    if (phone) return `https://wa.me/${phone.startsWith("27") ? phone : "27" + phone}?text=${message}`;
+    return `https://wa.me/?text=${message}`;
+  }
+
+  function getEmailLink() {
+    const client = clients.find((c) => c.id === invoice?.clientId);
+    const email = client?.email || "";
+    const sub = (invoice?.lineItems || []).reduce((s, l) => s + l.quantity * l.rate, 0);
+    const total = sub + sub * ((invoice?.taxRate || 0) / 100) - (invoice?.discount || 0);
+    const sym = invoice?.currency === "ZAR" ? "R" : invoice?.currency === "EUR" ? "\u20AC" : invoice?.currency === "GBP" ? "\u00A3" : "$";
+    const pdfUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/invoices/pdf?id=${id}`;
+    const subject = encodeURIComponent(`Invoice ${invoice?.number || ""} - ${sym}${total.toFixed(2)}`);
+    const body = encodeURIComponent(
+      `Hi ${invoice?.clientName || ""},\n\n` +
+      `Please find your invoice ${invoice?.number || ""} for ${sym}${total.toFixed(2)}.\n\n` +
+      `Download/View PDF: ${pdfUrl}\n\n` +
+      `Thank you for your business!`
+    );
+    return `mailto:${email}?subject=${subject}&body=${body}`;
+  }
     return `https://wa.me/?text=${message}`;
   }
 
@@ -192,14 +209,8 @@ export default function InvoiceDetailPage() {
         <div className="flex gap-2">
           {!editing && <button onClick={() => setEditing(true)} className="text-sm text-indigo-600 hover:underline">Edit</button>}
           <button onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-sm text-green-600 hover:underline disabled:opacity-50">{downloadingPdf ? "Opening..." : "Download PDF"}</button>
-          <a
-            href={getWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-[#25D366] hover:underline font-medium"
-          >
-            Send via WhatsApp
-          </a>
+          <a href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="text-sm text-[#25D366] hover:underline font-medium">Send via WhatsApp</a>
+          <a href={getEmailLink()} className="text-sm text-blue-600 hover:underline font-medium">Email</a>
           <button onClick={handleDelete} className="text-sm text-red-600 hover:underline">Delete</button>
           <Link href="/invoices" className="text-sm text-gray-600 hover:text-gray-900">Back</Link>
         </div>
