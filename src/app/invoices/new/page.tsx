@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CURRENCIES, Client } from "@/lib/types";
-import { calculateSubtotal, calculateTotal } from "@/lib/utils";
+import { calculateSubtotal, calculateTotal, formatCurrency } from "@/lib/utils";
 
 interface LineItemForm { description: string; quantity: number; rate: number; }
 const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
@@ -27,6 +27,11 @@ export default function NewInvoicePage() {
   const [lineItems, setLineItems] = useState<LineItemForm[]>([{ description: "", quantity: 1, rate: 0 }]);
   const [saving, setSaving] = useState(false);
   const [dateError, setDateError] = useState("");
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [savingClient, setSavingClient] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -61,6 +66,24 @@ export default function NewInvoicePage() {
   function removeLineItem(index: number) { if (lineItems.length === 1) return; setLineItems(lineItems.filter((_, i) => i !== index)); }
   function updateLineItem(index: number, field: keyof LineItemForm, value: string | number) { const updated = [...lineItems]; (updated[index] as any)[field] = value; setLineItems(updated); }
   function handleClientChange(id: string) { setClientId(id); const client = clients.find((c) => c.id === id); setClientName(client?.name || ""); }
+
+  async function handleAddClient(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingClient(true);
+    const res = await fetch("/api/clients", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newClientName, email: newClientEmail, phone: newClientPhone }),
+    });
+    if (res.ok) {
+      const newClient = await res.json();
+      setClients([...clients, newClient]);
+      setClientId(newClient.id);
+      setClientName(newClient.name);
+      setShowNewClient(false);
+      setNewClientName(""); setNewClientEmail(""); setNewClientPhone("");
+    }
+    setSavingClient(false);
+  }
 
   const subtotal = calculateSubtotal(lineItems);
   const total = calculateTotal(subtotal, taxRate, discount);
@@ -100,7 +123,10 @@ export default function NewInvoicePage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">Client</label>
+              <button type="button" onClick={() => setShowNewClient(true)} className="text-xs text-indigo-600 hover:underline">+ Add new client</button>
+            </div>
             <select value={clientId} onChange={(e) => handleClientChange(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">Select a client</option>
               {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
@@ -132,7 +158,7 @@ export default function NewInvoicePage() {
                 <div><label className="block text-xs text-gray-500 mb-1">Description</label><input type="text" value={item.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} placeholder="Item description" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                 <div><label className="block text-xs text-gray-500 mb-1">Qty</label><input type="number" value={item.quantity} onChange={(e) => updateLineItem(i, "quantity", parseFloat(e.target.value) || 0)} min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                 <div><label className="block text-xs text-gray-500 mb-1">Rate</label><input type="number" value={item.rate} onChange={(e) => updateLineItem(i, "rate", parseFloat(e.target.value) || 0)} min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                <div><label className="block text-xs text-gray-500 mb-1">Amount</label><div className="px-3 py-2 text-sm bg-gray-50 rounded-md border border-gray-200">{(item.quantity * item.rate).toFixed(2)}</div></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Amount</label><div className="px-3 py-2 text-sm bg-gray-50 rounded-md border border-gray-200">{formatCurrency(item.quantity * item.rate, currency)}</div></div>
                 <button type="button" onClick={() => removeLineItem(i)} className="text-red-500 hover:text-red-700 pb-2">&times;</button>
               </div>
             ))}
@@ -141,10 +167,10 @@ export default function NewInvoicePage() {
         </div>
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="space-y-3">
-            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>{formatCurrency(subtotal, currency)}</span></div>
             <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Tax (%)</span><input type="number" value={taxRate} onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" className="w-24 border border-gray-300 rounded-md px-3 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
             <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Discount</span><input type="number" value={discount} onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)} min="0" step="any" className="w-24 border border-gray-300 rounded-md px-3 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div className="border-t pt-3 flex justify-between font-semibold"><span>Total</span><span className="text-indigo-600">{total.toFixed(2)}</span></div>
+            <div className="border-t pt-3 flex justify-between font-semibold"><span>Total</span><span className="text-indigo-600">{formatCurrency(total, currency)}</span></div>
           </div>
           <div className="mt-4"><label className="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Payment terms, thank you note, etc." className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
         </div>
@@ -153,6 +179,32 @@ export default function NewInvoicePage() {
           <Link href="/invoices" className="px-6 py-2 rounded-md font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</Link>
         </div>
       </form>
+
+      {showNewClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewClient(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Add New Client</h3>
+            <form onSubmit={handleAddClient} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input type="text" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input type="tel" value={newClientPhone} onChange={(e) => setNewClientPhone(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={savingClient} className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{savingClient ? "Adding..." : "Add Client"}</button>
+                <button type="button" onClick={() => setShowNewClient(false)} className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
