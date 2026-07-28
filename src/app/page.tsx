@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
       <h1 className="text-5xl font-bold text-gray-900 mb-4">
-        <span className="text-indigo-600">Invoice</span>Pro
+        <span className="text-indigo-600">GOGO</span> Invoice
       </h1>
       <p className="text-xl text-gray-600 mb-8 max-w-md">
         Professional invoicing made simple. Create, send, and track invoices for your business.

@@ -4,7 +4,7 @@ import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "InvoicePro - Professional Invoicing",
+  title: "GOGO Invoice - Professional Invoicing",
   description: "Create and manage invoices with ease",
 };
 

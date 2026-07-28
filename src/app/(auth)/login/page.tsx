@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="flex justify-center items-center min-h-[70vh]">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-sm border border-gray-200">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-6">Sign in to InvoicePro</h1>
+        <h1 className="text-2xl font-bold text-center text-gray-900 mb-6">Sign in to GOGO Invoice</h1>
         {error && <p className="text-red-600 text-sm text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
