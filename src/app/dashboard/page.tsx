@@ -11,18 +11,22 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [currency, setCurrency] = useState("ZAR");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
     if (status === "authenticated") {
-      fetch("/api/invoices")
-        .then((res) => res.json())
-        .then((data) => {
-          setInvoices(Array.isArray(data) ? data : []);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
+      Promise.all([
+        fetch("/api/invoices").then((r) => r.json()),
+        fetch("/api/business").then((r) => r.json()),
+      ]).then(([invData, bizData]) => {
+        setInvoices(Array.isArray(invData) ? invData : []);
+        if (bizData && !bizData.error) {
+          setCurrency(bizData.defaultCurrency || "ZAR");
+        }
+        setLoading(false);
+      }).catch(() => setLoading(false));
     }
   }, [status, router]);
 
@@ -30,7 +34,6 @@ export default function DashboardPage() {
     return <div className="text-center py-12 text-gray-500">Loading...</div>;
   }
 
-  const user = session?.user as any;
   const totalRevenue = invoices
     .filter((i) => i.status === "paid")
     .reduce((sum, i) => {
@@ -70,7 +73,7 @@ export default function DashboardPage() {
         </div>
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <p className="text-sm text-gray-600">Revenue</p>
-          <p className="text-2xl font-bold text-indigo-600">{formatCurrency(totalRevenue, user?.currency || "USD")}</p>
+          <p className="text-2xl font-bold text-indigo-600">{formatCurrency(totalRevenue, currency)}</p>
         </div>
       </div>
 
