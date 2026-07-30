@@ -93,34 +93,113 @@ export default function NewInvoicePage() {
 
   const handleVoiceResult = useCallback((text: string) => {
     if (!text.trim()) return;
-    const lines = text.split(/[,.]|\band\b/i).map((s) => s.trim()).filter(Boolean);
+    const lower = text.toLowerCase();
 
-    const nameMatch = text.match(/(?:for|to|bill)\s+(.+?)(?:,|\.|\band\b)/i);
-    if (nameMatch) setClientName(nameMatch[1].trim());
+    const WORD_NUMS: Record<string, number> = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, twenty:20, thirty:30, forty:40, fifty:50, hundred:100, thousand:1000 };
+    function parseWordNum(s: string): number { return WORD_NUMS[s.toLowerCase()] || 0; }
+    function parseQuantity(s: string): number {
+      const n = parseInt(s);
+      if (!isNaN(n)) return n;
+      const w = s.toLowerCase().trim();
+      if (WORD_NUMS[w]) return WORD_NUMS[w];
+      const parts = w.split(/\s*-\s*/);
+      if (parts.length === 2) return (parseWordNum(parts[0]) || 0) + (parseWordNum(parts[1]) || 0);
+      return 0;
+    }
+    function parseAmount(s: string): number {
+      const cleaned = s.replace(/[R$£€,\s]/g, "").replace(/rand|dollar|usd/gi, "");
+      return parseFloat(cleaned) || 0;
+    }
 
+    const nameMatch = text.match(/(?:for|to|bill)\s+(.+?)(?:,|\.|:|\band\b)/i);
+    if (nameMatch) {
+      const extracted = nameMatch[1].trim().split(/\s+(?:who|and|orders|buys|bought|wants|needs)/i)[0].trim();
+      if (extracted.length > 1 && !WORD_NUMS[extracted.toLowerCase()]) setClientName(extracted);
+    }
+
+    const lines = text.split(/[.;,]|\band\b/i).map((s) => s.trim()).filter(Boolean);
     const items: LineItemForm[] = [];
+    let totalFromVoice = 0;
+
     for (const line of lines) {
-      const itemMatch = line.match(/(\d+)\s+(.+?)\s+(?:at|@|each)?\s*[R$£€]?\s*([\d,]+(?:\.\d+)?)/i);
-      if (itemMatch) {
+      const lowerLine = line.toLowerCase();
+
+      const totalMatch = line.match(/(?:total|amount|sum|comes?\s+to|equals?)[\s:]*(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars|usd|gbp|eur)?/i);
+      if (totalMatch) {
+        totalFromVoice = parseAmount(totalMatch[1]);
+        continue;
+      }
+
+      if (lowerLine.match(/^(total|subtotal|tax|vat|discount|date|invoice|receipt|bill)$/i)) continue;
+
+      const qtyItemPrice = line.match(
+        /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty)\s+(.+?)\s+(?:at|@|each|per|for)\s+(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars|each|per\s+unit)?/i
+      );
+      if (qtyItemPrice) {
         items.push({
-          description: itemMatch[2].trim(),
-          quantity: parseInt(itemMatch[1]) || 1,
-          rate: parseFloat(itemMatch[3].replace(/,/g, "")) || 0,
+          description: qtyItemPrice[2].trim().replace(/\s+at\s+.*$/i, ""),
+          quantity: parseQuantity(qtyItemPrice[1]) || 1,
+          rate: parseAmount(qtyItemPrice[3]),
         });
-      } else {
-        const simpleMatch = line.match(/(.+?)\s+[R$£€]?\s*([\d,]+(?:\.\d+)?)/i);
-        if (simpleMatch && !simpleMatch[1].match(/total|tax|vat|discount|subtotal|invoice|date/i)) {
-          items.push({
-            description: simpleMatch[1].trim(),
-            quantity: 1,
-            rate: parseFloat(simpleMatch[2].replace(/,/g, "")) || 0,
-          });
+        continue;
+      }
+
+      const itemQtyPrice = line.match(
+        /(.+?)\s*[-:x]\s*(\d+)\s+(?:units?|pieces?|pcs|items?)?\s*(?:at|@|each|per)?\s*(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars)?/i
+      );
+      if (itemQtyPrice) {
+        items.push({
+          description: itemQtyPrice[1].trim(),
+          quantity: parseInt(itemQtyPrice[2]) || 1,
+          rate: parseAmount(itemQtyPrice[3]),
+        });
+        continue;
+      }
+
+      const priceMatch = line.match(
+        /(.+?)\s+(?:R|ZAR|\$|£|€)\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars)?/i
+      );
+      if (priceMatch && !lowerLine.match(/total|tax|vat|discount|subtotal/)) {
+        items.push({
+          description: priceMatch[1].trim(),
+          quantity: 1,
+          rate: parseAmount(priceMatch[2]),
+        });
+        continue;
+      }
+
+      const itemThenPrice = line.match(
+        /(.+?)\s+([\d,]+(?:\.\d+)?)\s*(?:rand|rands|dollars|usd)/i
+      );
+      if (itemThenPrice && !lowerLine.match(/total|tax|vat|discount|subtotal|invoice/)) {
+        const desc = itemThenPrice[1].trim();
+        if (desc.length > 1) {
+          items.push({ description: desc, quantity: 1, rate: parseAmount(itemThenPrice[2]) });
+          continue;
         }
+      }
+
+      const descOnly = line.trim();
+      if (descOnly.length > 2 && !lowerLine.match(/total|tax|vat|discount|subtotal|invoice|date|receipt|amount|sum|rand|dollar/i)) {
+        items.push({ description: descOnly, quantity: 1, rate: 0 });
       }
     }
 
-    if (items.length > 0) setLineItems(items);
-    else setNotes((prev) => prev ? prev + "\n" + text : text);
+    if (items.length === 0 && totalFromVoice > 0) {
+      items.push({ description: "Invoice total", quantity: 1, rate: totalFromVoice });
+    }
+
+    if (items.length > 0) {
+      const filledItems = items.map((item) => ({
+        ...item,
+        description: item.description || "Item",
+        quantity: item.quantity || 1,
+        rate: item.rate || 0,
+      }));
+      setLineItems(filledItems);
+    } else {
+      setNotes((prev) => prev ? prev + "\n" + text : text);
+    }
   }, []);
 
   async function handleAddClient(e: React.FormEvent) {
