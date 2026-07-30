@@ -132,7 +132,7 @@ export default function VoiceDictation({ onResult }: VoiceDictationProps) {
       )}
 
       <div className="mt-3 text-xs text-gray-400">
-        <p>Try saying: &quot;Invoice for John Smith, 5 widgets at R100 each, total R500&quot;</p>
+        <p>Try saying: &quot;Invoice for John Smith, 5 coats at R100 each, total R500&quot;</p>
       </div>
     </div>
   );

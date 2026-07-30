@@ -93,95 +93,95 @@ export default function NewInvoicePage() {
 
   const handleVoiceResult = useCallback((text: string) => {
     if (!text.trim()) return;
-    const lower = text.toLowerCase();
 
-    const WORD_NUMS: Record<string, number> = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, twenty:20, thirty:30, forty:40, fifty:50, hundred:100, thousand:1000 };
-    function parseWordNum(s: string): number { return WORD_NUMS[s.toLowerCase()] || 0; }
-    function parseQuantity(s: string): number {
-      const n = parseInt(s);
-      if (!isNaN(n)) return n;
+    const WORD_NUMS: Record<string, number> = {
+      one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+      eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17,
+      eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50, sixty:60,
+      seventy:70, eighty:80, ninety:90, hundred:100, thousand:1000
+    };
+
+    function parseWordNum(s: string): number {
       const w = s.toLowerCase().trim();
       if (WORD_NUMS[w]) return WORD_NUMS[w];
       const parts = w.split(/\s*-\s*/);
       if (parts.length === 2) return (parseWordNum(parts[0]) || 0) + (parseWordNum(parts[1]) || 0);
+      const multParts = w.split(/\s+/);
+      if (multParts.length === 2 && WORD_NUMS[multParts[0]] && WORD_NUMS[multParts[1]]) {
+        return WORD_NUMS[multParts[0]] * WORD_NUMS[multParts[1]];
+      }
       return 0;
     }
+
+    function parseQuantity(s: string): number {
+      const n = parseInt(s);
+      if (!isNaN(n)) return n;
+      return parseWordNum(s);
+    }
+
     function parseAmount(s: string): number {
-      const cleaned = s.replace(/[R$£€,\s]/g, "").replace(/rand|dollar|usd/gi, "");
+      const cleaned = s.replace(/[R$£€,\s]/g, "").replace(/rand|dollar|usd|gbp|eur/gi, "");
       return parseFloat(cleaned) || 0;
     }
 
-    const nameMatch = text.match(/(?:for|to|bill)\s+(.+?)(?:,|\.|:|\band\b)/i);
-    if (nameMatch) {
-      const extracted = nameMatch[1].trim().split(/\s+(?:who|and|orders|buys|bought|wants|needs)/i)[0].trim();
-      if (extracted.length > 1 && !WORD_NUMS[extracted.toLowerCase()]) setClientName(extracted);
+    const qtyWords = Object.keys(WORD_NUMS).join("|");
+
+    const clientMatch = text.match(
+      new RegExp(`(?:invoice\\s+)?(?:for|to|bill)\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)?)`, "i")
+    );
+    if (clientMatch) {
+      const name = clientMatch[1].trim();
+      if (name.length > 1 && name.toLowerCase() !== "garden") {
+        setClientName(name);
+      }
+    }
+    if (!clientMatch || clientMatch[1].toLowerCase() === "garden") {
+      const fallback = text.match(/(?:invoice\\s+)?(?:for|to|bill)\\s+garden\\s+([A-Z][a-z]+)/i);
+      if (fallback) setClientName(fallback[1].trim());
     }
 
-    const lines = text.split(/[.;,]|\band\b/i).map((s) => s.trim()).filter(Boolean);
-    const items: LineItemForm[] = [];
     let totalFromVoice = 0;
+    const totalMatch = text.match(
+      /(?:total|amount|sum|comes?\s+to|equals?|all\s+up)[\s:]*(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars|usd|gbp|eur)?/i
+    );
+    if (totalMatch) totalFromVoice = parseAmount(totalMatch[1]);
 
-    for (const line of lines) {
-      const lowerLine = line.toLowerCase();
+    const cleaned = text.replace(/(?:total|amount|sum|comes?\s+to|equals?|all\s+up)[\s:]*(?:R|ZAR|\$|£|€)?\s*[\d,]+(?:\.\d+)?\s*(?:rand|dollars|usd|gbp|eur)?/gi, "").trim();
 
-      const totalMatch = line.match(/(?:total|amount|sum|comes?\s+to|equals?)[\s:]*(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars|usd|gbp|eur)?/i);
-      if (totalMatch) {
-        totalFromVoice = parseAmount(totalMatch[1]);
-        continue;
-      }
+    const segments = cleaned.split(/[.;]|\band\b(?=\s+\d)/i).map((s) => s.trim()).filter(Boolean);
+    const items: LineItemForm[] = [];
 
-      if (lowerLine.match(/^(total|subtotal|tax|vat|discount|date|invoice|receipt|bill)$/i)) continue;
-
-      const qtyItemPrice = line.match(
-        /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty)\s+(.+?)\s+(?:at|@|each|per|for)\s+(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars|each|per\s+unit)?/i
+    for (const seg of segments) {
+      const qtyItemPrice = seg.match(
+        new RegExp(`(${qtyWords}|\\d+)\\s+(.+?)\\s+(?:at|@|each|per|for)\\s+(?:R|ZAR|\\$|£|€)?\\s*([\\d,]+(?:\\.\\d+)?)\\s*(?:rand|dollars|each|per\\s+unit)?`, "i")
       );
       if (qtyItemPrice) {
         items.push({
-          description: qtyItemPrice[2].trim().replace(/\s+at\s+.*$/i, ""),
+          description: qtyItemPrice[2].trim(),
           quantity: parseQuantity(qtyItemPrice[1]) || 1,
           rate: parseAmount(qtyItemPrice[3]),
         });
         continue;
       }
 
-      const itemQtyPrice = line.match(
-        /(.+?)\s*[-:x]\s*(\d+)\s+(?:units?|pieces?|pcs|items?)?\s*(?:at|@|each|per)?\s*(?:R|ZAR|\$|£|€)?\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars)?/i
-      );
-      if (itemQtyPrice) {
-        items.push({
-          description: itemQtyPrice[1].trim(),
-          quantity: parseInt(itemQtyPrice[2]) || 1,
-          rate: parseAmount(itemQtyPrice[3]),
-        });
-        continue;
-      }
-
-      const priceMatch = line.match(
+      const priceItem = seg.match(
         /(.+?)\s+(?:R|ZAR|\$|£|€)\s*([\d,]+(?:\.\d+)?)\s*(?:rand|dollars)?/i
       );
-      if (priceMatch && !lowerLine.match(/total|tax|vat|discount|subtotal/)) {
+      if (priceItem && !priceItem[1].match(/total|tax|vat|discount|subtotal/i)) {
         items.push({
-          description: priceMatch[1].trim(),
+          description: priceItem[1].trim(),
           quantity: 1,
-          rate: parseAmount(priceMatch[2]),
+          rate: parseAmount(priceItem[2]),
         });
         continue;
       }
 
-      const itemThenPrice = line.match(
+      const itemRand = seg.match(
         /(.+?)\s+([\d,]+(?:\.\d+)?)\s*(?:rand|rands|dollars|usd)/i
       );
-      if (itemThenPrice && !lowerLine.match(/total|tax|vat|discount|subtotal|invoice/)) {
-        const desc = itemThenPrice[1].trim();
-        if (desc.length > 1) {
-          items.push({ description: desc, quantity: 1, rate: parseAmount(itemThenPrice[2]) });
-          continue;
-        }
-      }
-
-      const descOnly = line.trim();
-      if (descOnly.length > 2 && !lowerLine.match(/total|tax|vat|discount|subtotal|invoice|date|receipt|amount|sum|rand|dollar/i)) {
-        items.push({ description: descOnly, quantity: 1, rate: 0 });
+      if (itemRand && !itemRand[1].match(/total|tax|vat|discount|subtotal|invoice/i)) {
+        items.push({ description: itemRand[1].trim(), quantity: 1, rate: parseAmount(itemRand[2]) });
+        continue;
       }
     }
 
@@ -190,13 +190,12 @@ export default function NewInvoicePage() {
     }
 
     if (items.length > 0) {
-      const filledItems = items.map((item) => ({
+      setLineItems(items.map((item) => ({
         ...item,
         description: item.description || "Item",
         quantity: item.quantity || 1,
         rate: item.rate || 0,
-      }));
-      setLineItems(filledItems);
+      })));
     } else {
       setNotes((prev) => prev ? prev + "\n" + text : text);
     }
