@@ -20,6 +20,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [rawText, setRawText] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [tips, setTips] = useState(true);
   const [showRaw, setShowRaw] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -31,64 +32,111 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
     const items: { description: string; quantity: number; rate: number }[] = [];
 
     const totalPatterns = [
-      /(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[R$£€]?\s*([\d,]+\.?\d*)/i,
-      /[R$£€]\s*([\d,]+\.?\d*)\s*(?:total|due)/i,
+      /(?:total|amount\s*due|balance\s*due|grand\s*total|net\s*total)[:\s]*(?:R|ZAR|\$|£|€)?\s*([\d,]+\.?\d*)\s*(?:rand|usd|gbp|eur)?/i,
+      /(?:R|ZAR|\$|£|€)\s*([\d,]+\.?\d*)\s*(?:total|due)/i,
+      /(?:TOTAL|TOT|AMT)[\s|.]*([\d,]+\.?\d*)/i,
+      /\[(\d{3,})/,
+      /(?:subtotal|sub\s*total)[:\s]*(?:R|ZAR|\$|£|€)?\s*([\d,]+\.?\d*)/i,
     ];
     for (const pattern of totalPatterns) {
       const match = text.match(pattern);
       if (match) {
-        total = parseFloat(match[1].replace(/,/g, ""));
-        break;
+        const val = parseFloat(match[1].replace(/,/g, ""));
+        if (val > 0 && (val > total || total === 0)) total = val;
       }
     }
 
-    const billToMatch = text.match(/(?:bill\s*to|client|customer|sold\s*to)[:\s]*(.+)/i);
-    if (billToMatch) clientName = billToMatch[1].trim();
-
-    if (!clientName) {
-      for (const line of lines.slice(0, 10)) {
-        if (line.length > 3 && line.length < 50 && !line.match(/^\d/) && !line.match(/invoice|date|number|total|tax|vat/i)) {
-          clientName = line;
+    const billToPatterns = [
+      /(?:bill\s*to|client|customer|sold\s*to|account\s*(?:name|holder)|name)[:\s]*(.+)/i,
+      /(?:ACC(?:OUNT)?\s*(?:NAME|NAM|NAN))[:\s]*(.+)/i,
+    ];
+    for (const pattern of billToPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const extracted = match[1].trim().split(/\s{2,}/)[0].trim();
+        if (extracted.length > 1 && extracted.length < 60) {
+          clientName = extracted;
           break;
         }
       }
     }
 
-    const itemPattern = /^(\d+)\s+(.{3,60}?)\s+[R$£€]?\s*([\d,]+\.?\d*)\s+[R$£€]?\s*([\d,]+\.?\d*)$/;
-    const simpleItemPattern = /^(.{3,60}?)\s+[R$£€]?\s*([\d,]+\.?\d*)$/;
+    if (!clientName) {
+      for (const line of lines.slice(0, 15)) {
+        if (
+          line.length > 2 && line.length < 50 &&
+          !line.match(/^\d+$/) &&
+          !line.match(/invoice|date|number|total|tax|vat|account|acct|discount|subtotal|balance|phone|tel|fax|email|address|reg|vat\s*no/i) &&
+          !line.match(/^[R$£€]/) &&
+          !line.match(/^\d{2,}/) &&
+          line.match(/[A-Za-z]{2,}/)
+        ) {
+          clientName = line.replace(/[|[\]]/g, "").trim();
+          break;
+        }
+      }
+    }
+
+    const itemPatterns = [
+      /^(\d+)\s+(.{2,60}?)\s+(?:R|ZAR|\$|£|€)\s*([\d,]+\.?\d*)\s+(?:R|ZAR|\$|£|€)\s*([\d,]+\.?\d*)$/i,
+      /^(\d+)\s+(.{2,60}?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/,
+      /^(.{2,60}?)\s+(\d+)\s+(?:x|@|\*)\s*(?:R|ZAR|\$|£|€)?\s*([\d,]+\.?\d*)/i,
+    ];
 
     for (const line of lines) {
-      const itemMatch = line.match(itemPattern);
-      if (itemMatch) {
-        items.push({
-          description: itemMatch[2].trim(),
-          quantity: parseInt(itemMatch[1]) || 1,
-          rate: parseFloat(itemMatch[3].replace(/,/g, "")) || 0,
-        });
-        continue;
+      const clean = line.replace(/[|[\]]/g, "").trim();
+      let matched = false;
+
+      for (const pattern of itemPatterns) {
+        const itemMatch = clean.match(pattern);
+        if (itemMatch) {
+          const desc = (itemMatch[2] || itemMatch[1]).trim();
+          if (!desc.match(/total|tax|vat|subtotal|discount|amount|date|invoice|account/i)) {
+            items.push({
+              description: desc,
+              quantity: parseInt(itemMatch[1]) || 1,
+              rate: parseFloat((itemMatch[3] || "0").replace(/,/g, "")) || 0,
+            });
+            matched = true;
+            break;
+          }
+        }
       }
-      const simpleMatch = line.match(simpleItemPattern);
-      if (simpleMatch && !simpleMatch[1].match(/total|tax|vat|subtotal|discount|amount|date|invoice/i)) {
-        items.push({
-          description: simpleMatch[1].trim(),
-          quantity: 1,
-          rate: parseFloat(simpleMatch[2].replace(/,/g, "")) || 0,
-        });
+
+      if (!matched) {
+        const priceOnLine = clean.match(/(.{2,40}?)\s+(?:R|ZAR|\$|£|€)\s*([\d,]+\.?\d+)/i);
+        if (priceOnLine && !priceOnLine[1].match(/total|tax|vat|subtotal|discount|amount|date|invoice|account|subtotal/i)) {
+          items.push({
+            description: priceOnLine[1].replace(/[|[\]]/g, "").trim(),
+            quantity: 1,
+            rate: parseFloat(priceOnLine[2].replace(/,/g, "")) || 0,
+          });
+        }
       }
     }
 
     if (items.length === 0 && total > 0) {
-      items.push({ description: "Scanned item", quantity: 1, rate: total });
+      items.push({ description: "Scanned invoice total", quantity: 1, rate: total });
     }
 
     return { clientName, items, total, rawText: text };
   }, []);
+
+  const isTextGarbled = (text: string): boolean => {
+    const garbageChars = (text.match(/[|[\]{}\\]/g) || []).length;
+    const totalChars = text.replace(/\s/g, "").length;
+    if (totalChars === 0) return true;
+    const garbageRatio = garbageChars / totalChars;
+    const longWords = text.split(/\s+/).filter((w) => w.length > 8 && !w.match(/[aeiou]/i)).length;
+    return garbageRatio > 0.05 || longWords > 5;
+  };
 
   const processImage = useCallback(async (file: File) => {
     setScanning(true);
     setProgress(0);
     setError("");
     setRawText(null);
+    setTips(false);
 
     try {
       const worker = await createWorker("eng", 1, {
@@ -103,6 +151,17 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
       await worker.terminate();
 
       setRawText(data.text);
+
+      if (!data.text || data.text.trim().length < 10) {
+        setError("Could not read any text from this image. Try a clearer, flatter photo.");
+        setScanning(false);
+        return;
+      }
+
+      if (isTextGarbled(data.text)) {
+        setError("Text quality is low. Results may be inaccurate — please check and edit the fields below.");
+      }
+
       const result = parseInvoiceText(data.text);
       onScanResult(result);
     } catch (err) {
@@ -131,6 +190,19 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
           <p className="text-xs text-gray-500">Scan a paper invoice with your camera or upload a photo</p>
         </div>
       </div>
+
+      {tips && !preview && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-xs font-medium text-amber-800 mb-2">&#x1F4A1; Tips for best results:</p>
+          <ul className="text-xs text-amber-700 space-y-1">
+            <li>&#x2022; Lay the invoice <b>flat</b> on a surface</li>
+            <li>&#x2022; Make sure <b>all text is visible</b> — don&apos;t cover with hands</li>
+            <li>&#x2022; Use <b>good lighting</b> (no shadows over text)</li>
+            <li>&#x2022; Hold phone <b>directly above</b> (not at an angle)</li>
+            <li>&#x2022; Ensure text is <b>in focus</b> before capturing</li>
+          </ul>
+        </div>
+      )}
 
       <div className="flex gap-3 mb-4">
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
@@ -169,7 +241,11 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+      {error && (
+        <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800">{error}</p>
+        </div>
+      )}
 
       {rawText && !scanning && (
         <div className="mt-3">
