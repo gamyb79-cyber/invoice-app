@@ -255,7 +255,7 @@ export default function InvoiceDetailPage() {
                   <div><input type="number" value={item.quantity || ""} onChange={(e) => updateLineItem(i, "quantity", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} placeholder="0" min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                   <div><input type="number" value={item.rate || ""} onChange={(e) => updateLineItem(i, "rate", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} placeholder="0.00" min="0" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                   <div className="px-3 py-2 text-sm bg-gray-50 rounded-md border border-gray-200">{(item.quantity * item.rate).toFixed(2)}</div>
-                  <button type="button" onClick={() => removeLineItem(i)} className="text-red-500 hover:text-red-700 pb-2">&times;</button>
+                  <div className="flex flex-col items-center gap-0.5 pb-2"><button type="button" onClick={() => removeLineItem(i)} className="text-red-500 hover:text-red-700 text-lg leading-none">&times;</button><span className="text-[9px] text-red-400">Remove</span></div>
                 </div>
               ))}
             </div>
