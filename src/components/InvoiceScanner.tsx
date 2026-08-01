@@ -14,6 +14,20 @@ interface InvoiceScannerProps {
   onScanResult: (result: ScanResult) => void;
 }
 
+async function pdfToImage(file: File): Promise<Blob> {
+  const pdfjsLib = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs" as any);
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const page = await pdf.getPage(1);
+  const scale = 2;
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d")!;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), "image/png"));
+}
+
 export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -131,7 +145,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
     return garbageRatio > 0.05 || longWords > 5;
   };
 
-  const processImage = useCallback(async (file: File) => {
+  const processImage = useCallback(async (imageBlob: Blob, isPDF = false) => {
     setScanning(true);
     setProgress(0);
     setError("");
@@ -147,7 +161,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
         },
       });
 
-      const { data } = await worker.recognize(file);
+      const { data } = await worker.recognize(imageBlob);
       await worker.terminate();
 
       setRawText(data.text);
@@ -170,14 +184,34 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
     setScanning(false);
   }, [parseInvoiceText, onScanResult]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const isPDF = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+    if (isPDF) {
+      setTips(false);
+      setScanning(true);
+      setProgress(0);
+      setError("Converting PDF to image...");
+      try {
+        const imageBlob = await pdfToImage(file);
+        const url = URL.createObjectURL(imageBlob);
+        setPreview(url);
+        await processImage(imageBlob, true);
+      } catch {
+        setError("Failed to read PDF. Please try saving it as an image (JPG/PNG) first.");
+        setScanning(false);
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
     processImage(file);
-  };
+  }, [processImage]);
 
   return (
     <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -187,7 +221,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
         </div>
         <div>
           <h3 className="font-semibold text-gray-900">AI Invoice Scanner</h3>
-          <p className="text-xs text-gray-500">Scan a paper invoice with your camera or upload a photo</p>
+          <p className="text-xs text-gray-500">Scan a paper invoice with your camera or upload a photo/PDF</p>
         </div>
       </div>
 
@@ -199,14 +233,14 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
             <li>&#x2022; Make sure <b>all text is visible</b> — don&apos;t cover with hands</li>
             <li>&#x2022; Use <b>good lighting</b> (no shadows over text)</li>
             <li>&#x2022; Hold phone <b>directly above</b> (not at an angle)</li>
-            <li>&#x2022; Ensure text is <b>in focus</b> before capturing</li>
+            <li>&#x2022; You can also <b>upload a PDF</b> invoice</li>
           </ul>
         </div>
       )}
 
       <div className="flex gap-3 mb-4">
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*,.pdf,application/pdf" onChange={handleFileChange} className="hidden" />
         <button
           onClick={() => cameraInputRef.current?.click()}
           disabled={scanning}
@@ -219,14 +253,14 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
           disabled={scanning}
           className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          <span>&#x1F4C1;</span> Upload Image
+          <span>&#x1F4C1;</span> Upload Image / PDF
         </button>
       </div>
 
       {scanning && (
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-            <span>Scanning invoice...</span>
+            <span>{error ? "Processing..." : "Scanning invoice..."}</span>
             <span>{progress}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
