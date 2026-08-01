@@ -5,14 +5,15 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { CURRENCIES, Invoice, Client } from "@/lib/types";
-import { calculateSubtotal, calculateTotal, formatCurrency } from "@/lib/utils";
+import { calculateSubtotal, calculateTotal, formatCurrency, getStatusColor } from "@/lib/utils";
 import { useTranslation } from "@/lib/useTranslation";
+import { getTransitions, getStatusLabel, isFullyEditable } from "@/lib/workflow";
 import SmartReminder from "@/components/SmartReminder";
 import ClientRiskScore from "@/components/ClientRiskScore";
 
 interface LineItemForm { id?: string; description: string; quantity: number; rate: number; }
 interface BusinessInfo { name: string; email: string; phone: string; address: string; city: string; state: string; zip: string; country: string; taxId: string; logo: string; }
-const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
+const DEFAULT_STATUSES = ["draft", "quote", "approved", "invoice", "overdue", "partial", "paid", "cancelled", "credit"];
 
 function InvoicePDF({ invoice, business }: { invoice: Invoice; business: BusinessInfo | null }) {
   const subtotal = calculateSubtotal(invoice.lineItems);
@@ -23,7 +24,7 @@ function InvoicePDF({ invoice, business }: { invoice: Invoice; business: Busines
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "30px" }}>
         <div>
           {business?.logo && <img src={business.logo} alt="Logo" style={{ height: "60px", marginBottom: "10px", objectFit: "contain" }} />}
-          <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "#4f46e5", margin: 0 }}>INVOICE</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "#4f46e5", margin: 0 }}>{invoice.status === "quote" ? "QUOTE" : invoice.status === "approved" ? "APPROVED QUOTE" : invoice.status === "credit" ? "CREDIT NOTE" : invoice.status === "draft" ? "DRAFT" : "INVOICE"}</h1>
           <p style={{ fontSize: "18px", marginTop: "5px", color: "#555" }}>{invoice.number}</p>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -166,8 +167,15 @@ export default function InvoiceDetailPage() {
     setTimeout(() => { printWindow.print(); setDownloadingPdf(false); }, 500);
   }
 
-  function getStatusColor(s: string) {
-    switch (s) { case "paid": return "bg-green-100 text-green-800"; case "sent": return "bg-blue-100 text-blue-800"; case "overdue": return "bg-red-100 text-red-800"; case "draft": return "bg-gray-100 text-gray-800"; default: return "bg-indigo-100 text-indigo-800"; }
+  async function handleStatusTransition(newStatus: string) {
+    if (!confirm(`Change status to "${getStatusLabel(newStatus)"?`)) return;
+    setSaving(true);
+    const res = await fetch("/api/invoices", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, number, clientId, clientName, issueDate, dueDate, status: newStatus, currency, taxRate, discount, notes, lineItems }),
+    });
+    if (res.ok) { const data = await res.json(); setInvoice(data); setStatus(newStatus); } else { alert("Failed to update"); }
+    setSaving(false);
   }
 
   function getWhatsAppLink() {
@@ -277,6 +285,21 @@ export default function InvoiceDetailPage() {
         </form>
       ) : (
         <div className="space-y-6">
+          {(() => {
+            const transitions = getTransitions(invoice.status);
+            return transitions.length > 0 ? (
+              <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 mb-3">Actions</h2>
+                <div className="flex flex-wrap gap-2">
+                  {transitions.map((t) => (
+                    <button key={t.value} onClick={() => handleStatusTransition(t.value)} disabled={saving} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50 ${t.color}`}>
+                      <span>{t.icon}</span> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
           <div className="bg-white p-6 rounded-lg border border-gray-200">
             <div className="grid grid-cols-2 gap-6">
               <div><p className="text-sm text-gray-500">{t("newInvoice", "client")}</p><p className="font-medium">{invoice.clientName || "No client"}</p></div>

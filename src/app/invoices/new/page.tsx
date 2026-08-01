@@ -12,7 +12,7 @@ import VoiceDictation from "@/components/VoiceDictation";
 import NaturalLanguageCreator from "@/components/NaturalLanguageCreator";
 
 interface LineItemForm { description: string; quantity: number; rate: number; }
-const DEFAULT_STATUSES = ["draft", "sent", "paid", "overdue"];
+const DEFAULT_STATUSES = ["draft", "quote", "invoice", "paid", "overdue", "cancelled"];
 
 export default function NewInvoicePage() {
   const { data: session, status } = useSession();
