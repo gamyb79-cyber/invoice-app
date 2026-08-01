@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { createWorker } from "tesseract.js";
 
 interface ScanResult {
@@ -14,8 +14,24 @@ interface InvoiceScannerProps {
   onScanResult: (result: ScanResult) => void;
 }
 
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load " + src));
+    document.head.appendChild(script);
+  });
+}
+
 async function pdfToImage(file: File): Promise<Blob> {
-  const pdfjsLib = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs" as any);
+  const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+  const WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  await loadScript(PDFJS_URL);
+  const pdfjsLib = (window as any).pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const page = await pdf.getPage(1);
   const scale = 2;
@@ -145,7 +161,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
     return garbageRatio > 0.05 || longWords > 5;
   };
 
-  const processImage = useCallback(async (imageBlob: Blob, isPDF = false) => {
+  const runOCR = useCallback(async (imageBlob: Blob) => {
     setScanning(true);
     setProgress(0);
     setError("");
@@ -167,7 +183,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
       setRawText(data.text);
 
       if (!data.text || data.text.trim().length < 10) {
-        setError("Could not read any text from this image. Try a clearer, flatter photo.");
+        setError("Could not read any text from this file. Please try a clearer image.");
         setScanning(false);
         return;
       }
@@ -179,7 +195,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
       const result = parseInvoiceText(data.text);
       onScanResult(result);
     } catch (err) {
-      setError("Failed to scan image. Please try again.");
+      setError("Failed to scan. Please try again.");
     }
     setScanning(false);
   }, [parseInvoiceText, onScanResult]);
@@ -194,14 +210,15 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
       setTips(false);
       setScanning(true);
       setProgress(0);
-      setError("Converting PDF to image...");
+      setError("Converting PDF...");
       try {
         const imageBlob = await pdfToImage(file);
         const url = URL.createObjectURL(imageBlob);
         setPreview(url);
-        await processImage(imageBlob, true);
+        setError("");
+        await runOCR(imageBlob);
       } catch {
-        setError("Failed to read PDF. Please try saving it as an image (JPG/PNG) first.");
+        setError("Failed to read PDF. Try saving it as an image (JPG/PNG) first.");
         setScanning(false);
       }
       return;
@@ -210,8 +227,8 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
     const reader = new FileReader();
     reader.onload = (ev) => setPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
-    processImage(file);
-  }, [processImage]);
+    runOCR(file);
+  }, [runOCR]);
 
   return (
     <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -260,7 +277,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
       {scanning && (
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-            <span>{error ? "Processing..." : "Scanning invoice..."}</span>
+            <span>{error === "Converting PDF..." ? "Converting PDF..." : "Scanning invoice..."}</span>
             <span>{progress}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -275,7 +292,7 @@ export default function InvoiceScanner({ onScanResult }: InvoiceScannerProps) {
         </div>
       )}
 
-      {error && (
+      {error && error !== "Converting PDF..." && (
         <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
           <p className="text-sm text-amber-800">{error}</p>
         </div>
