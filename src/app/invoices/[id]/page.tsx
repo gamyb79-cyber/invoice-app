@@ -168,7 +168,7 @@ export default function InvoiceDetailPage() {
   }
 
   async function handleStatusTransition(newStatus: string) {
-    if (!confirm(`Change status to "${getStatusLabel(newStatus)"?`)) return;
+    if (!confirm(`Change status to "${getStatusLabel(newStatus)}"?`)) return;
     setSaving(true);
     const res = await fetch("/api/invoices", {
       method: "PUT", headers: { "Content-Type": "application/json" },
